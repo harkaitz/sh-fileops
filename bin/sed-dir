@@ -1,0 +1,87 @@
+#!/bin/sh -e
+#L:
+#L:  MIT License
+#L:  
+#l:  Bug reports, feature requests to gemini|https://harkadev.com/oss
+#l:  Copyright (c) 2022 Harkaitz Agirre, harkaitz.aguirre@gmail.com
+#L:
+#L:  Permission is hereby granted, free of charge, to any person obtaining
+#L:  a copy of this software and associated documentation files (the
+#L:  "Software"), to deal in the Software without restriction, including
+#L:  without limitation the rights to use, copy, modify, merge, publish,
+#L:  distribute, sublicense, and/or sell copies of the Software, and to
+#L:  permit persons to whom the Software is furnished to do so, subject to
+#L:  the following conditions:
+#L:
+#L:  The above copyright notice and this permission notice shall be
+#L:  included in all copies or substantial portions of the Software.
+#L:
+#L:  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#L:  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#L:  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#L:  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+#L:  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#L:  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+#L:  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##:
+#h: Usage: $0 [-f][...] CMD DIR...
+#h:
+#h: Apply a sed command to all files in directories.
+#h:
+#h: -w REGEX : Only files that contain this regex.
+##:
+sed_dir() {
+    ## Parse command line options.
+    local OPTIND optopt= opt_f= opt_w= d_ifs="${IFS}" f= IFS="
+"
+    while getopts "fw:" optopt;do # OPTARG
+        local ops="${ops}${optopt}"
+        case $optopt in
+            f)  local opt_f=y;;
+            w)  local opt_w="${OPTARG}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    local opt_cmd="${1}"
+    if test ! -n "${opt_cmd}";then
+        echo "sed-dir: error: Please specify a sed command." >&2
+        return 1
+    fi
+    shift
+    if test ! -n "${1}";then
+        echo "sed-dir: error: Please specify at least one directory." >&2
+        return 1
+    fi
+    ##
+    for f in `find "$@" -type f -not -iregex '.*/\.git/.*'`;do
+        if test -n "${opt_w}" && ! grep "${opt_w}" "${f}" >/dev/null;then
+            continue
+        fi
+        if test ! @"${opt_f}" = @"y";then
+            echo sed -i'.tmp' "${opt_cmd}" "${f}"     >&2
+            echo rm -f                     "${f}.tmp" >&2
+            continue
+        fi
+        sed -i'.tmp' "${opt_cmd}" "${f}"     >&2
+        rm -f                     "${f}.tmp" >&2
+    done
+    
+    
+
+    
+}
+## -----------------------------------------------------------------------------
+SCRNAME="`basename "$0"`"
+if test @"${SCRNAME}" = @"sed-dir";then
+    case "$1" in
+        -h|--help|'')
+            sed -n 's/^ *#h: \{0,1\}//p' "$0" | sed "s|\\\$0|`basename $0`|g"
+            echo ""
+            sed -n 's/^ *#l: \{0,2\}//p' "$0"
+            ;;
+        *)
+            sed_dir "$@"
+            ;;
+    esac
+fi
