@@ -24,54 +24,73 @@
 #L:  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 #L:  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ##:
-#h: Usage: $0 [-mg] SEDCMD [OUTDIR]
+#h: Usage: $0 [-mg] SEDCMD [OUTDIR] < FILE-LIST
 #h:
-#h: This program reads a file list, performs a transformation with sed and
-#h: then copies to that new path in OUTDIR (directories are created). Files
-#h: are only copied once.
+#h: This program reads a file list, performs a transformation
+#h: with sed and then copies to that new path in OUTDIR (directories
+#h: are created). Files are only copied once.
 #h:
 #h:     -m : Use 'mv' instead of 'cp'.
 #h:     -g : Use 'git mv' instead of 'cp'.
 ##:
 cp_with_sed() {
     local OPTIND optopt= o_m= o_g=
-    while getopts "mg" optopt;do # OPTARG
+    while getopts "mg" optopt; do # OPTARG
         case $optopt in
-            m) local o_m=y;;
-            g) local o_g=y;;
-            \?) return 1;;
+            m)  local o_m=y;;
+            g)  local o_g=y
+                if ! which git >/dev/null 2>&1; then
+                    error "Please install 'git', needed by 'cp-with-sed'"
+                    return 1
+                fi
+                ;;
+            \?) return 1
+                ;;
         esac
     done
     shift $(( $OPTIND - 1 ))
     local sedcmd="$1" outdir="$2" fr= to=
-    while read fr;do
+    while read -r fr; do
         local to="`echo "${fr}" | sed "${sedcmd}"`"
         local count="`echo "${to}" | wc -l`"
-        if test @"${count}" = @"0";then
+        if test @"${count}" = @"0"; then
             continue
-        elif test ! @"${count}" = @"1";then
-            echo "cp-with-sed: error: File ${fr} replaces to more than one." >&2
+        elif test ! @"${count}" = @"1"; then
+            error "File ${fr} replaces to more than one."
             exit 1
         fi
-        if test ! -n "${outdir}";then
+        if test ! -n "${outdir}"; then
             echo "${to}"
             continue
         fi
-        local to="${outdir}/${to}"
+        local to="`realpath -- "${outdir}/${to}"`"
+        local fr="`realpath -- "${fr}"`"
+        if test @"${fr}" = @"${to}"; then
+            continue
+        fi
+        mkdir -p "`dirname "${to}"`"
         echo ".-- ${fr}" >&2
         echo "'-> ${to}" >&2
-        mkdir -p "`dirname "${to}"`"
-        if test @"${o_m}" = @"y";then
-            mv "${fr}" "${to}"
-        elif test @"${o_g}" = @"y";then
-            git mv "${fr}" "${to}"
+        if test @"${o_m}" = @"y"; then
+            mv -- "${fr}" "${to}"
+        elif test @"${o_g}" = @"y"; then
+            git mv -- "${fr}" "${to}"
         else
-            cp "${fr}" "${to}"
+            cp -- "${fr}" "${to}"
         fi
     done
     
 }
-if test @"`basename "$0"`" = @"cp-with-sed";then
+## -----------------------------------------------------------------------------
+SCRNAME="`basename "$0"`"
+error() { echo "${SCRNAME}: error: $*" >&2; }
+## -----------------------------------------------------------------------------
+if ! which realpath >/dev/null 2>&1; then
+    error "Please install 'realpath' needed by 'cp-with-sed'."
+    return 1
+fi
+## -----------------------------------------------------------------------------
+if test @"${SCRNAME}" = @"cp-with-sed";then
     if test ! "$#" = "0";then
         cp_with_sed "$@"
     else
